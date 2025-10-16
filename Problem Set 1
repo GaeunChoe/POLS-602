@@ -1,1 +1,105 @@
+---
+title: "Problem Set 1"
+author: "Ellie Choe"
+date: "2025-10-11"
+output: pdf_document
+---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+set.seed(123)
+```
+
+# ---- Simulation ----
+```{r}
+# Population
+ages <- c("10s", "20s", "30s", "40s", "50s")
+p_pop <- c(0.15, 0.30, 0.25, 0.20, 0.10)
+names(p_pop) <- ages
+```
+
+```{r}
+# Sample Sizes 
+n_vals <- c(50, 100, 500, 1000)
+
+# Create an Empty Data Frame
+res <- data.frame(
+  n = integer(),
+  group = character(),
+  age = character(),
+  prop = numeric()
+)
+
+# Simulation Loop
+for (n in n_vals) {
+  trait <- sample(ages, size = n, replace = TRUE, prob = p_pop) # Draw a random sample
+  Z <- rbinom(n, 1, 0.5) # Randomly assign each obervation to Treatment (1) or Control (0)
+  prop_all <- as.numeric(table(factor(trait, levels = ages))) / n # Calculate proportions for the entire sample
+  prop_treat <- as.numeric(table(factor(trait[Z == 1], levels = ages))) / sum(Z == 1) # Calculate proportions within the Treatment group
+  prop_control <- as.numeric(table(factor(trait[Z == 0], levels = ages))) / sum(Z == 0) # Calculate proportions within the Control group
+res <- rbind(res, data.frame(n = n, group = "All", age = ages, prop = prop_all), data.frame(n = n, group = "Treat", age = ages, prop = prop_treat), data.frame(n = n, group = "Control", age = ages, prop = prop_control)) # Combine results 
+}
+
+head(res)
+```
+```{r}
+# Convergence to the Population Distribution
+pop_tbl <- data.frame(age = ages, pop_prop = p_pop)
+
+ggplot(res, aes(x = n, y = prop, color = group)) + geom_point() + geom_line() + geom_hline(data = pop_tbl, aes(yintercept = pop_prop), linetype = 2, color = "black") + facet_wrap(~ age, nrow = 2) + labs(title = "Larger Samples -> Closer to Population Proportion", subtitle = "Dashed line = True population proportion", x = "Sample size (n)", y = "Proportion") + theme_minimal()
+```
+
+```{r}
+# Imbalance Between Treatment and Control
+imbalance <- res %>% filter(group %in% c("Treat", "Control")) %>% pivot_wider(names_from = group, values_from = prop) %>% mutate(abs_diff = abs(Treat - Control)) %>% group_by(n) %>% summarise(max_abs_diff = max(abs_diff), .groups = "drop")
+
+ggplot(imbalance, aes(x = n, y = max_abs_diff)) + geom_hline(yintercept = 0, linetype = 2) + geom_point(size = 2) + geom_line() + labs(title = "Larger Samples -> Smaller Imbalance Between Treatment and Control", x = "Sample size (n)", y = "Max |Treat - Control| across age groups") + theme_minimal()
+```
+
+# ---- data analysis ----
+```{r}
+df <- read.csv("voting.csv")
+```
+
+# 1. Treatment variable
+variable: message
+type: discrete
+data type: character
+
+# 2. create a binary variable
+```{r}
+df$treat <- ifelse(df$message == "yes", 1, 0)
+```
+
+# 3. Compute the average outcome for the treatement and control groups
+```{r}
+avg_treat <- mean(df$voted[df$treat == 1]) # average voting rate among treated voters
+avg_ctrl <- mean(df$voted[df$treat == 0]) # average voting rate among control voters. If avg_treat > avg_ctrl, the message increased turnout.
+```
+
+# 4. Subset the data frame
+```{r}
+treat_df <- df[df$treat == 1, ]
+ctrl_df <- df[df$treat == 0, ]
+```
+
+# 5. Average birth year
+```{r}
+mean(treat_df$birth)
+mean(ctrl_df$birth)
+```
+
+# 6. Estimated Average Causal Effect
+```{r}
+ate <- avg_treat - avg_ctrl
+ate # it means treated voters were 8.1 percentage points more likely to vote.
+```
+
+# 7. Assumption for generalization
+The sample must be representative of the US population, and the treatment effect must be homogeneous across subgroups.
