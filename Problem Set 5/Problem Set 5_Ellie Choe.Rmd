@@ -1,0 +1,102 @@
+---
+title: "Problem Set 5"
+author: "Ellie Choe"
+date: "2025-12-11"
+output: pdf_document
+---
+# Part 1: Simulation
+## Create a simulated data set with a dependent variable that is a linear function of a treatment variable and a confounding variable. Fit a linear model for the true data generating process and print the summary table.
+```{r}
+set.seed(1)
+n <- 500 
+
+# confounder
+Z <- rnorm(n, mean=0, sd=1)
+
+# treatment 
+X <- rnorm(n, mean=0, sd=1) + 0.5*Z
+
+# true model parameters
+beta0 <- 4
+beta1 <- 2
+beta2 <- 3
+sigma <- 1
+
+# error term
+epsilon <- rnorm(n, mean=0, sd=sigma)
+
+# dependent variable
+Y <- beta0 + beta1*X + beta2*Z + epsilon
+
+# Combine into a data frame
+df <- data.frame(Y, X, Z)
+head(df)
+
+# fit the true linear model
+true_model <- lm(Y ~ X + Z, data=df)
+summary(true_model)
+```
+
+## Using the true model, demonstrate that the coefficient for your treatment variable follows the central limit theorem. That is, demonstrate that the coefficient’s sampling distribution is approximately normal.
+```{r}
+# CLT demonstration 
+b <- 1000
+beta1_samples <- numeric(b)
+
+# boostrap samling loop
+for(i in 1:b) {
+  sample <- df[sample(1:n, n, replace=TRUE), ]
+  model <- lm(Y~X+Z, data = sample)
+  beta1_samples[i] <- coef(model)["X"]
+}
+
+# sampling distribution histogram
+hist(beta1_samples, breaks=30, main="sampling distribution of beta1 (x) - true model", xlab="beta1 coefficient")
+```
+The bootstrap sampling distribution of the treatment coefficient $\beta_1$ is approximately normal, which is consistent with the Central Limit Theorem.
+
+## Compute the bootstrapped standard error for the coefficient of the treatment variable.
+```{r}
+# Calculate the boostrap standard error
+boot_se <- sd(beta1_samples)
+boot_se
+```
+
+## Fit a model that omits the confounding variable. Repeat part (a) for this new model and plot the sampling distribution of the treatment variable’s coefficient. How do your results differ? What does this imply about statistical tests based on a coefficient’s sampling distribution?
+```{r}
+# Omit confounder Z
+omitted_model <- lm(Y ~ X, data=df)
+summary(omitted_model)
+
+# prepare a vector
+beta1_omit_samples <- numeric(b)
+
+# Bootstrap sampling loop for the model omitting Z
+for(i in 1:b) {
+  sample <- df[sample(1:n, n, replace=TRUE), ]
+  model <- lm(Y~X, data = sample)
+  beta1_omit_samples[i] <- coef(model)["X"]
+}
+
+# Plot the sampling distribution
+hist(beta1_omit_samples, breaks=30, main="Sampling distribution of beta1 (x) (omitting Z)", xlab="beta1 coefficient")
+```
+The results diverge due to omitted variable bias. The estimator in the correctly specified model is unbiased, with its sampling distribution centered around the true parameter of 2. In contrast, omitting the confounder Z introduces an upward bias, shifting the distribution's center to approximately 3. This implies that statistical significant does not imply causal validity. 
+
+# Part 2: Data Analysis
+## Conduct a hypothesis test for a difference in means. You decide what the hypotheses are, whether you use a t-test or a z-test, and what the level of significance is. Explain your decisions, and interpret your results both substantively and statistically.
+```{r}
+voting <- read.csv("voting.csv")
+
+# Perform a two-sample t-test
+t_test_result <- t.test(voted ~ message, data=voting, var.equal=TRUE)
+t_test_result
+```
+The p-value should be smaller than 0.05, and in this case, it was 2.2e-16. Therefore, we can reject the null hypothesis. This means that the difference in voting rates between the message groups is statistically significant. Sending a message increases the probability of voting by approximately 8 percentage points, which represents a meaningful effect in practice. 
+## Using the same data, fit a linear model. Interpret the coe>icient, standard error, t-value, and p-value.
+```{r}
+# Fit a linear model 
+lm_model <- lm(voted ~ message, data = voting)
+summary(lm_model)
+```
+The results show that the intercept is 0.2966, representing the mean voting rate for the "no message" group. The coefficient for messageyes is 0.0813, indicating that sending a message increases the probability of voting by approximately 8 percentage points. The standard error of the coefficient is 0.002587, measuring the uncertainty around this estimate. The t-value is 31.43, reflecting how many standard errors the coefficient is away from zero, and the p-value is less than 2e-16. This very small p-value shows that the effect of sending a message is statistically significant, meaning that receiving a message has a positive impact on voting behavior.
