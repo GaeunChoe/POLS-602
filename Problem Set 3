@@ -1,0 +1,113 @@
+---
+title: "Problem Set 3"
+author: "Ellie Choe"
+date: "2025-11-18"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Paper Analysis
+## 1. Research Goals
+The primary goal of this study is not purely causal inference but a combination of description, theory testing, and prediction. The authors aim to determine whether structural conditions favoring insurgency cause civil war onset, explicitly challenging conventional wisdom regarding post-Cold War instability and ethnic grievances. They successfully articulate their research objectives by contrasting their "insurgency" theory with existing "ethnic" models. However, while their theoretical goal is causal, their methodological framework lacks a formal definition of a causal estimand. They rely on observing predictive associations through logistic regression rather than strictly identifying causal effects using a potential outcomes framework.
+
+## 2. Estimands
+The theoretical estimand is the causal effect of insurgency-favoring conditions on civil war onset. However, the connection between their theoretical concepts and empirical estimands is tenuous. First, the hypothesis structure is diffuse; by testing numerous hypotheses (H1–H11) largely to debunk conventional wisdom, the specific causal quantity of interest becomes obscured. Second, measurement validity is a concern. "Rough terrain" is proxied solely by mountainous terrain, omitting other favorable terrains like swamps or jungles—an omission the authors themselves acknowledge. More critically, "Poverty" is measured by GDP per capita. While the authors argue this proxies for "state capacity" (police/military strength), it also conflates other mechanisms, such as the opportunity cost for rebels. Thus, the coefficient on GDP captures a composite effect rather than the specific effect of state capacity. To clarify their estimands, the authors could have explicitly defined the causal quantity of interest, such as the average treatment effect of weak state capacity on civil war probability, and justified their measurement strategies more rigorously.
+
+## 3. Identification Strategy
+Fearon and Laitin employ a large-N cross-country design covering 161 countries from 1945 to 1999. Their identification strategy relies primarily on the assumption of selection on observables, using logistic regression with statistical controls rather than an explicit causal identification mechanism. To mitigate endogeneity, specifically simultaneity bias, they use lagged independent variables. They also conduct extensive robustness checks using alternative datasets and regional controls. Despite these efforts, the strategy does not fully address reverse causality or omitted variable bias because no instrumental variable or natural experiment is used to isolate exogenous variation in insurgency conditions.
+
+## 4. Assessment of Findings
+The empirical findings largely support the authors’ claims that structural factors like low income and rough terrain increase civil war risk, while ethnic diversity does not. However, the credibility of these findings is limited by validity concerns. First, interpreting the regression coefficients as strictly causal is problematic due to potential endogeneity. Second, the logistic regression model assumes a linear additive effect, which may oversimplify the complex, path-dependent data-generating process of civil war. Finally, regarding measurement, the proxy measures create mechanism indeterminacy. Since the data cannot distinguish whether the income effect is due to state weakness or rebel opportunity costs, the specific causal conclusion that "state weakness" is the primary driver is not fully supported by the data.
+
+## 5. Broader Contribution
+Despite these methodological limitations, this paper makes a seminal theoretical contribution. It shifted the analytical focus from "ethnic grievances" to "structural opportunities" for insurgency. By demonstrating that civil wars occur not because of diversity but because states are weak, it effectively debunked the view that ethnic partitions are a viable solution. This framework opened the door for future research on civil conflict, encouraging scholars and policymakers to focus on strengthening state administrative and police capabilities rather than solely on democratic reforms or ethnic rights.
+
+
+# Data Analysis
+## 1. Load the thermometers.csv data from the data folder on the github repo. Use the birth_year variable to create a new age variable (Note: This survey was taken in 2017).
+```{r}
+# load the data
+thermometers <- read.csv("https://raw.githubusercontent.com/MLBurnham/pols_602/refs/heads/main/data/thermometers.csv") 
+# create a new variable age
+thermometers$age <- 2017-(thermometers$birth_year)   
+
+```
+
+## 2. Pick one of the feeling thermometers and one of the categorical demographic variables (sex, race, party_id, or educ). Describe the spread and central tendency of the feeling thermometer both for all observations, and for each category in the demographic variable you chose. Use histograms or density plots to visualize the distribution.
+```{r}
+# The ft_black thermometers have a mean of 71.33, a median of 76, a standard deviation of 23.98, and range from 0 to 100
+summary(thermometers$ft_black) 
+sd(thermometers$ft_black, na.rm = TRUE) 
+
+# Visualize the distribution of all observations with a density plot
+plot(density(thermometers$ft_black, na.rm = TRUE),
+     main = "Density of ft_black (All respondents)",
+     xlab = "ft_black", ylab = "Density") 
+
+# Spread and central tendency of ft_black by race (one of the categorical demographic variables)
+library(dplyr)
+race_summary <- thermometers %>%
+  group_by(race) %>%
+  summarise(
+    mean = mean(ft_black, na.rm = TRUE),
+    median = median(ft_black, na.rm = TRUE),
+    sd = sd(ft_black, na.rm = TRUE),
+    min = min(ft_black, na.rm = TRUE),
+    max = max(ft_black, na.rm = TRUE)
+  ) 
+print(race_summary) 
+
+# Density plot showing the distribution of ft_black for each race
+library(ggplot2)
+ggplot(thermometers, aes(x = ft_black, color = race)) +
+  geom_density() +
+  labs(title = "Density of ft_black by Race",
+       x = "ft_black", y = "Density") +
+  theme_minimal() # Density plot showing the distribution of ft_black for each race
+```
+## 3. Fit a regression model to estimate the conditional mean of the feeling thermometer for each category in the demographic variable you chose.
+```{r}
+# Fit lm(ft_black ~ race) to estimate the conditional mean of ft_black for each racial category
+lm_ft_race <- lm(ft_black ~ race, data = thermometers) 
+summary(lm_ft_race) 
+```
+## 4. Create a new dataframe that only contains rows for Democrats and Republicans. Create a new binary variable for party_id
+```{r}
+# Creat a new dataframe that only contains rows for Democrats and Republicans
+df_demrep <- thermometers %>% filter(party_id %in% c("Democrat", "Republican"))
+# Create a new binary variable: Republican = 1, Democrat = 0
+df_demrep <- df_demrep %>% mutate(party_binary = ifelse(party_id == "Republican", 1, 0))
+
+head(df_demrep)
+```
+
+## 5. Use multiple linear regression to build a model that predicts your binary party_id variable. Use any combination of variables you like, but you should include at least one feeling thermometer and one interaction term. Justify your model.
+```{r}
+lm_interaction <- lm(party_binary ~ ft_fem * age, data = df_demrep)
+summary(lm_interaction)
+```
+I include ft_fem and age because younger respondents and those with higher feminism support are more likely to identify as Democrats.The interaction term allows the effect of feminism support on party identification to vary by age, reflecting that the influence of feminist attitudes may be stronger among younger individuals.
+
+## 6. The coefficients in your model represent the change in what?
+The ft_fem coefficient (-0.009218) indicates that, when age is 0, a one-point increase in ft_fem decreases the probability of being Republican by about 0.92%, or equivalently, increases the chance of being a Democrat. The age coefficient (0.002408) shows that, when ft_fem is 0, each additional year of age increases the probability of being Republican by about 0.24%. The interaction term (ft_fem:age = -0.000007731) indicates that as age increases, the negative effect of ft_fem on Republican probability becomes slightly stronger, though the effect is very small and not statistically significant.
+
+## 7. Select one of the feeling thermometers in your model and plot how your predicted values change as the feeling thermometer changes. Interpret your results. Can this reasonably be interpreted as a causal effect?
+```{r}
+library(ggplot2)
+mean_age <- mean(df_demrep$age, na.rm = TRUE)
+ft_fem_seq <- seq(min(df_demrep$ft_fem, na.rm = TRUE),
+                  max(df_demrep$ft_fem, na.rm = TRUE), length.out = 100)
+data_predicted <- data.frame(ft_fem = ft_fem_seq,
+                      age = mean_age)
+data_predicted$predicted <- predict(lm_interaction, newdata = data_predicted)
+ggplot(data_predicted, aes(x = ft_fem, y = predicted)) +
+  geom_line(color = "blue") +
+  labs(title = "Effect of Feminism Support on Predicted Party Identification",
+       x = "ft_fem score",
+       y = "Predicted Republican Probability") +
+  theme_minimal()
+```
+The plot illustrates the predicted probability of being Republican as a function of feminism support (ft_fem), with age held constant at its mean value. As ft_fem increases, the predicted probability of being Republican decreases, indicating that respondents with higher feminism support are more likely to identify as Democrats. This plot depicts an association observed in the data, and should not be interpreted as evidence of a causal relationship between feminism support and party affiliation.
